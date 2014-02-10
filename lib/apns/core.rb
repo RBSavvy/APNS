@@ -247,6 +247,7 @@ module APNS
     rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET => e
       if (retries += 1) < 5
         self.remove_connection(host, port)
+        puts "[APNS] Retrying (#{retries}/5) #{e.inspect}" if @logging
         retry
       else
         # too-many retries, re-raise
