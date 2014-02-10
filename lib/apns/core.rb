@@ -1,5 +1,5 @@
 # Copyright (c) 2009 James Pozdena, 2010 Justin.tv, 2013 William Denniss
-#  
+#
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
 # files (the "Software"), to deal in the Software without
@@ -8,10 +8,10 @@
 # copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following
 # conditions:
-#  
+#
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-#  
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 # OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -20,11 +20,11 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
- 
+
 module APNS
   require 'socket'
   require 'openssl'
-  
+
   # Host for push notification service
   # production: gateway.push.apple.com
   # development: gateway.sandbox.apple.com
@@ -49,7 +49,7 @@ module APNS
   @truncate_ellipsis_str = "\u2026"
 
   @message_clean_whitespace = false
-  
+
   @logging = true
 
   class << self
@@ -78,7 +78,7 @@ module APNS
       puts "[APNS] send 1 notification package to #{@host}" if @logging
     end
   end
-  
+
   def self.send_notifications(notifications)
     self.with_notification_connection do |conn|
       notifications.each do |n|
@@ -88,7 +88,7 @@ module APNS
       puts "[APNS] sent #{notifications.count} notification package(s) to #{@host}" if @logging
     end
   end
-  
+
   def self.feedback
     apns_feedback = []
     self.with_feedback_connection do |conn|
@@ -98,10 +98,10 @@ module APNS
         apns_feedback << self.parse_feedback_tuple(data)
       end
     end
-    
+
     return apns_feedback
   end
-  
+
   protected
 
   # Each tuple is in the following format:
@@ -126,15 +126,15 @@ module APNS
     #return [0, 32, pt, pm.bytesize, pm].pack("cna*na*") # old format (NB. s> notation only compatible with ruby 1.9.3 and above)
 
     expiry_unix = expiry.to_i
-    expiry_unix = 0 if expiry_unix < 0 # for APNS a zero timestamp has the same effect as a negative one and we are only encoding signed ints 
+    expiry_unix = 0 if expiry_unix < 0 # for APNS a zero timestamp has the same effect as a negative one and we are only encoding signed ints
     puts "[APNS] packaging notification for device:[#{device_token}] identifier:#{identifier} expiry:#{expiry_unix} payload-size:(#{pm.bytesize}) payload:#{pm}" if @logging
     [1, identifier.to_i, expiry_unix, 32, pt, pm.bytesize, pm].pack("cNNna*na*")
   end
-  
+
   def self.packaged_token(device_token)
     [device_token.gsub(/[\s|<|>]/,'')].pack('H*')
   end
-  
+
   def self.packaged_message(message)
     if message.is_a?(Hash)
       hash = message
@@ -146,7 +146,7 @@ module APNS
     hash = Truncate.truncate_notification(hash, @message_clean_whitespace, @truncate_mode, @truncate_soft_max_chopped, @truncate_ellipsis_str)
     ApnsJSON.apns_json(hash)
   end
-  
+
   def self.with_notification_connection(&block)
     self.with_connection(self.host, self.port, &block)
   end
@@ -161,13 +161,13 @@ module APNS
   ensure
     @cache_connections = cache_temp
   end
- 
+
   private
 
   def self.open_connection(host, port)
     raise "The path to your pem file is not set. (APNS.pem = /path/to/cert.pem)" unless self.pem
     raise "The path to your pem file does not exist!" unless File.exist?(self.pem)
-    
+
     context      = OpenSSL::SSL::SSLContext.new
     context.cert = OpenSSL::X509::Certificate.new(File.read(self.pem))
     context.key  = OpenSSL::PKey::RSA.new(File.read(self.pem), self.pass)
@@ -244,15 +244,19 @@ module APNS
         ssl.close
         sock.close
       end
-    rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET
+    rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET => e
       if (retries += 1) < 5
         self.remove_connection(host, port)
         retry
       else
         # too-many retries, re-raise
+        puts "[APNS] #{e.inspect}" if @logging
         raise
       end
+    rescue Exception => e
+      puts "[APNS] #{e.inspect}" if @logging
+      raise
     end
   end
-  
+
 end

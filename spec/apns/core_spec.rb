@@ -1,5 +1,5 @@
 # Copyright (c) 2013 William Denniss
-#  
+#
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
 # files (the "Software"), to deal in the Software without
@@ -8,10 +8,10 @@
 # copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following
 # conditions:
-#  
+#
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-#  
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 # OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -38,23 +38,23 @@ describe APNS do
     json = ApnsJSON.apns_json([string])
     json.should == "[\"\u{1F511}\"]"
   end
-  
+
   it "should return JSON escaped" do
     n = {:aps => {:alert => "\u2601Hello iPhone", :badge => 3, :sound => 'awesome.caf'}}
     json = ApnsJSON.apns_json(n)
     json.should  == "{\"aps\":{\"alert\":\"\u2601Hello iPhone\",\"badge\":3,\"sound\":\"awesome.caf\"}}"
   end
-  
+
   it "should throw exception if payload is too big" do
     # too big with alert
     notification = {:aps => {:alert => "#{LONG_MESSAGE_QBF}#{LONG_MESSAGE_QBF}", :badge => '1', :sound => 'default'}, :server_info => {:type => 'example', :data => 12345, :something => LONG_MESSAGE_QBF, :again => LONG_MESSAGE_QBF}}
     expect { APNS.packaged_notification("12345678901234567890123456789012",  notification, 1, Time.now + 14400) }.to raise_error(APNSException)
-  
+
     # too big without alert
     notification = notification = {:aps => {:badge => '1', :sound => 'default'}, :server_info => {:type => 'example', :data => 12345, :something => LONG_MESSAGE_QBF, :again => LONG_MESSAGE_QBF}}
     expect { APNS.packaged_notification("12345678901234567890123456789012",  notification, 1, Time.now + 14400) }.to raise_error(APNSException)
   end
-  
+
   describe '#packaged_message' do
 
     it "should return JSON with notification information" do
@@ -82,5 +82,21 @@ describe APNS do
       Base64.encode64(n).should == "AQAAAAFRe77HACDe8s79hOcAQHsiYXBzIjp7ImFsZXJ0IjoiSGVsbG8gaVBo\nb25lIiwiYmFkZ2UiOjMsInNvdW5kIjoiYXdlc29tZS5jYWYifX0=\n"
     end
   end
-   
+
+  describe '#with_connection' do
+    it "should retry Errno::ECONNABORTED 5 times" do
+      APNS.stub(:get_connection) { raise Errno::ECONNABORTED}
+      APNS.should_receive(:get_connection).exactly(5).times
+
+      expect { APNS.with_notification_connection()}.to raise_error(Errno::ECONNABORTED)
+    end
+
+    it "should not retry for other connection errors" do
+      APNS.stub(:get_connection) { raise Exception}
+      APNS.should_receive(:get_connection).exactly(1).times
+
+      expect { APNS.with_notification_connection()}.to raise_error(Exception)
+    end
+  end
+
 end
