@@ -75,7 +75,7 @@ module APNS
     self.with_notification_connection do |conn|
       conn.write(self.packaged_notification(device_token, message, notification_id, expiry))
       conn.flush
-      puts "[APNS] send 1 notification package to #{@host}" if @logging
+      log "send 1 notification package to #{@host}"
     end
   end
 
@@ -85,7 +85,8 @@ module APNS
         conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
       end
       conn.flush
-      puts "[APNS] sent #{notifications.count} notification package(s) to #{@host}" if @logging
+      log "flushing connection buffer"
+      log "#{notifications.count} notification package(s) to #{@host}"
     end
   end
 
@@ -98,7 +99,7 @@ module APNS
         apns_feedback << self.parse_feedback_tuple(data)
       end
     end
-
+    log "Found #{apns_feedback.count} pieces of feedback"
     return apns_feedback
   end
 
@@ -127,7 +128,7 @@ module APNS
 
     expiry_unix = expiry.to_i
     expiry_unix = 0 if expiry_unix < 0 # for APNS a zero timestamp has the same effect as a negative one and we are only encoding signed ints
-    puts "[APNS] packaging notification for device:[#{device_token}] identifier:#{identifier} expiry:#{expiry_unix} payload-size:(#{pm.bytesize}) payload:#{pm}" if @logging
+    log "packaging notification for device:[#{device_token}] identifier:#{identifier} expiry:#{expiry_unix} payload-size:(#{pm.bytesize}) payload:#{pm}"
     [1, identifier.to_i, expiry_unix, 32, pt, pm.bytesize, pm].pack("cNNna*na*")
   end
 
@@ -182,8 +183,10 @@ module APNS
       if (retries += 1) < 5
         sleep 1
         retry
+        log "Retrying #open_connection (#{retries}/5) #{e.inspect}"
       else
         # Too many retries, re-raise this exception
+        log "Error #open_connection #{e.inspect}"
         raise
       end
     end
@@ -247,17 +250,23 @@ module APNS
     rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET => e
       if (retries += 1) < 5
         self.remove_connection(host, port)
-        puts "[APNS] Retrying (#{retries}/5) #{e.inspect}" if @logging
+        log "Retrying #with_connection (#{retries}/5) #{e.inspect}"
         retry
       else
         # too-many retries, re-raise
-        puts "[APNS] #{e.inspect}" if @logging
+        log "Error #with_connection e.inspect"
         raise
       end
     rescue Exception => e
-      puts "[APNS] #{e.inspect}" if @logging
+      log e.inspect
       raise
     end
+  end
+
+  private
+
+  def log(message)
+    puts "[APNS] #{message}" if @logging
   end
 
 end
