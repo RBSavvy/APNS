@@ -77,20 +77,20 @@ module APNS
     self.with_notification_connection do |conn|
       conn.write(self.packaged_notification(device_token, message, notification_id, expiry))
       conn.flush
-      log "send 1 notification package to #{@host}"
+      self.log "send 1 notification package to #{@host}"
     end
   end
 
   def self.send_notifications(notifications)
     notifications.each_slice(@max_notifications_count) do |notification_group|
-      log "Starting new notification group"
+      self.log "Starting new notification group"
       self.with_notification_connection do |conn|
         notification_group.each do |n|
           conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
         end
         conn.flush
-        log "flushing connection buffer"
-        log "#{notifications.count} notification package(s) to #{@host}"
+        self.log "flushing connection buffer"
+        self.log "#{notifications.count} notification package(s) to #{@host}"
       end
     end
   end
@@ -104,7 +104,7 @@ module APNS
         apns_feedback << self.parse_feedback_tuple(data)
       end
     end
-    log "Found #{apns_feedback.count} pieces of feedback"
+    self.log "Found #{apns_feedback.count} pieces of feedback"
     return apns_feedback
   end
 
@@ -133,7 +133,7 @@ module APNS
 
     expiry_unix = expiry.to_i
     expiry_unix = 0 if expiry_unix < 0 # for APNS a zero timestamp has the same effect as a negative one and we are only encoding signed ints
-    log "packaging notification for device:[#{device_token}] identifier:#{identifier} expiry:#{expiry_unix} payload-size:(#{pm.bytesize}) payload:#{pm}"
+    self.log "packaging notification for device:[#{device_token}] identifier:#{identifier} expiry:#{expiry_unix} payload-size:(#{pm.bytesize}) payload:#{pm}"
     [1, identifier.to_i, expiry_unix, 32, pt, pm.bytesize, pm].pack("cNNna*na*")
   end
 
@@ -188,10 +188,10 @@ module APNS
       if (retries += 1) < 5
         sleep 1
         retry
-        log "Retrying #open_connection (#{retries}/5) #{e.inspect}"
+        self.log "Retrying #open_connection (#{retries}/5) #{e.inspect}"
       else
         # Too many retries, re-raise this exception
-        log "Error #open_connection #{e.inspect}"
+        self.log "Error #open_connection #{e.inspect}"
         raise
       end
     end
@@ -255,15 +255,15 @@ module APNS
     rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET => e
       if (retries += 1) < 5
         self.remove_connection(host, port)
-        log "Retrying #with_connection (#{retries}/5) #{e.inspect}"
+        self.log "Retrying #with_connection (#{retries}/5) #{e.inspect}"
         retry
       else
         # too-many retries, re-raise
-        log "Error #with_connection e.inspect"
+        self.log "Error #with_connection e.inspect"
         raise
       end
     rescue Exception => e
-      log e.inspect
+      self.log e.inspect
       raise
     end
   end
