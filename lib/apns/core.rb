@@ -48,12 +48,14 @@ module APNS
   @truncate_soft_max_chopped = 15
   @truncate_ellipsis_str = "\u2026"
 
+  @max_notifications_count = 200
+
   @message_clean_whitespace = false
 
   @logging = true
 
   class << self
-    attr_accessor :host, :port, :feedback_host, :feedback_port, :pem, :pass, :cache_connections, :message_clean_whitespace, :truncate_mode, :truncate_soft_max_chopped, :truncate_ellipsis_str, :logging
+    attr_accessor :host, :port, :feedback_host, :feedback_port, :pem, :pass, :cache_connections, :message_clean_whitespace, :truncate_mode, :truncate_soft_max_chopped, :truncate_ellipsis_str, :logging, :max_notifications_count
   end
 
   def self.establish_notification_connection
@@ -80,13 +82,16 @@ module APNS
   end
 
   def self.send_notifications(notifications)
-    self.with_notification_connection do |conn|
-      notifications.each do |n|
-        conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
+    notifications.each_slice(@max_notifications_count) do |notification_group|
+      log "Starting new notification group"
+      self.with_notification_connection do |conn|
+        notification_group.each do |n|
+          conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
+        end
+        conn.flush
+        log "flushing connection buffer"
+        log "#{notifications.count} notification package(s) to #{@host}"
       end
-      conn.flush
-      log "flushing connection buffer"
-      log "#{notifications.count} notification package(s) to #{@host}"
     end
   end
 
