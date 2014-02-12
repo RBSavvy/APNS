@@ -48,7 +48,8 @@ module APNS
   @truncate_soft_max_chopped = 15
   @truncate_ellipsis_str = "\u2026"
 
-  @max_notifications_count = 200
+  @max_notifications_count = 50
+  @connection_retry_count = 15
 
   @message_clean_whitespace = false
 
@@ -185,10 +186,10 @@ module APNS
       ssl.connect
       return ssl, sock
     rescue SystemCallError
-      if (retries += 1) < 5
+      if (retries += 1) < @connection_retry_count
         sleep 1
         retry
-        puts "[APNS] Retrying #open_connection (#{retries}/5) #{e.inspect}" if @logging
+        puts "[APNS] Retrying #open_connection (#{retries}/#{@connection_retry_count}) #{e.inspect}" if @logging
       else
         # Too many retries, re-raise this exception
         puts "[APNS] Error #open_connection #{e.inspect}" if @logging
@@ -253,9 +254,9 @@ module APNS
         sock.close
       end
     rescue Errno::ECONNABORTED, Errno::EPIPE, Errno::ECONNRESET => e
-      if (retries += 1) < 5
+      if (retries += 1) < @connection_retry_count
         self.remove_connection(host, port)
-        puts "[APNS] Retrying #with_connection (#{retries}/5) #{e.inspect}" if @logging
+        puts "[APNS] Retrying #with_connection (#{retries}/#{@connection_retry_count}) #{e.inspect}" if @logging
         retry
       else
         # too-many retries, re-raise
