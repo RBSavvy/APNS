@@ -97,7 +97,7 @@ module APNS
           puts "[APNS] #{notifications.count} notification package(s) to #{@host}"
         end
       rescue CannotContinueError => e
-        # If you've retried 5 times, move to the next in the loop
+        # If you've retried more than @connection_retry_count times, move to the next iteration of the loop
         next
       end
     end
@@ -267,7 +267,7 @@ module APNS
         retry
       else
         # too-many retries, re-raise
-        puts "[APNS] Error #with_connection e.inspect" if @logging
+        puts "[APNS] Too many retries #with_connection #{e.inspect}" if @logging
         raise CannotContinueError
       end
     rescue Exception => e
