@@ -22,6 +22,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 module APNS
+  class CannotContinueError < StandardError; end
+
   require 'socket'
   require 'openssl'
 
@@ -83,14 +85,19 @@ module APNS
 
   def self.send_notifications(notifications)
     notifications.each_slice(@max_notifications_count) do |notification_group|
-      puts "[APNS] Starting new notification group"
-      self.with_notification_connection do |conn|
-        notification_group.each do |n|
-          conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
+      begin
+        puts "[APNS] Starting new notification group"
+        self.with_notification_connection do |conn|
+          notification_group.each do |n|
+            conn.write(self.packaged_notification(n[0], n[1], (n[2] or rand(9999)), (n[3] or (Time.now + 1.year))))
+          end
+          conn.flush
+          puts "[APNS] flushing connection buffer"
+          puts "[APNS] #{notifications.count} notification package(s) to #{@host}"
         end
-        conn.flush
-        puts "[APNS] flushing connection buffer"
-        puts "[APNS] #{notifications.count} notification package(s) to #{@host}"
+      rescue CannotContinueError => e
+        # If you've retried 5 times, move to the next in the loop
+        next
       end
     end
   end
@@ -192,7 +199,7 @@ module APNS
       else
         # Too many retries, re-raise this exception
         puts "[APNS] Error #open_connection #{e.inspect}" if @logging
-        raise
+        raise CannotContinueError
       end
     end
   end
@@ -260,7 +267,7 @@ module APNS
       else
         # too-many retries, re-raise
         puts "[APNS] Error #with_connection e.inspect" if @logging
-        raise
+        raise CannotContinueError
       end
     rescue Exception => e
       puts "[APNS] #{e.inspect}" if @logging

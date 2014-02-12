@@ -88,7 +88,7 @@ describe APNS do
       APNS.stub(:get_connection) { raise Errno::ECONNABORTED}
       APNS.should_receive(:get_connection).exactly(5).times
 
-      expect { APNS.with_notification_connection()}.to raise_error(Errno::ECONNABORTED)
+      expect { APNS.with_notification_connection()}.to raise_error
     end
 
     it "should not retry for other connection errors" do
@@ -97,6 +97,14 @@ describe APNS do
 
       expect { APNS.with_notification_connection()}.to raise_error(Exception)
     end
+
+    it "should retry 5 times and then raise CannotContinueError" do
+      APNS.stub(:get_connection) { raise Errno::ECONNABORTED}
+
+      expect { APNS.with_notification_connection()}.to raise_error(CannotContinueError)
+    end
+
+
   end
 
 end
